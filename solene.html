@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solenne Studio - Gestão</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #fce4ec; padding: 15px; margin: 0; }
+        .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #ad1457; margin-bottom: 5px; font-size: 24px; }
+        h3 { color: #ad1457; margin-top: 20px; border-bottom: 1px solid #f8bbd0; padding-bottom: 5px; }
+        
+        /* Painel de Saldos */
+        .painel-financeiro { background: #fdf2f8; padding: 15px; border-radius: 12px; border: 1px solid #f8bbd0; margin-bottom: 20px; }
+        .linha-financeira { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+        .liquido-box { border-top: 2px solid #ad1457; padding-top: 10px; margin-top: 5px; font-weight: bold; font-size: 16px; color: #2e7d32; }
+        
+        .card { background: #fff; border: 1px solid #f8bbd0; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .instrucao-data { font-size: 11px; color: #ad1457; font-weight: bold; margin-bottom: 2px; display: block; }
+        
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #f06292; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        
+        .btn-agenda { background-color: #ec407a; }
+        .btn-gasto { background-color: #d32f2f; }
+        .btn-concluir { background-color: #4caf50; width: auto; padding: 8px; }
+        .btn-editar { background-color: #fbc02d; color: #000; width: auto; padding: 8px; }
+        .btn-excluir { background-color: #f44336; width: auto; padding: 8px; }
+        
+        .item-lista { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 12px 0; font-size: 14px; }
+        .acoes { display: flex; gap: 5px; }
+        .negativo { color: #d32f2f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Solenne Studio ✨</h1>
+
+    <div class="painel-financeiro">
+        <div class="linha-financeira">
+            <span>Saldo Previsto (Agenda):</span>
+            <span id="saldoPrevisto">R$ 0,00</span>
+        </div>
+        <div class="linha-financeira">
+            <span>Registro de Gastos:</span>
+            <span id="saldoGastos" class="negativo">R$ 0,00</span>
+        </div>
+        <div class="linha-financeira liquido-box">
+            <span>Saldo Líquido:</span>
+            <span id="saldoLiquido">R$ 0,00</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 id="titulo-form" style="margin-top:0">📅 Nova Marcação</h3>
+        <input type="text" id="ag_cliente" placeholder="Nome da Cliente">
+        <input type="text" id="ag_proc" placeholder="Procedimento">
+        <input type="number" id="ag_valor" placeholder="Valor (R$)">
+        
+        <label class="instrucao-data">Escolha abaixo o dia e horário para realizar o agendamento:</label>
+        <input type="datetime-local" id="ag_data">
+        
+        <button id="btn-principal" class="btn-agenda" onclick="processarAgendamento()">Agendar</button>
+        <button id="btn-cancelar-edit" style="display:none; background:#999;" onclick="cancelarEdicao()">Cancelar Edição</button>
+    </div>
+
+    <div class="card">
+        <h3>💸 Registrar Gasto</h3>
+        <input type="text" id="g_desc" placeholder="Ex: Compra de Shampoos">
+        <input type="number" id="g_valor" placeholder="Valor Gasto (R$)">
+        <button class="btn-gasto" onclick="adicionarGasto()">Registrar Saída</button>
+    </div>
+
+    <h3>📍 Próximos Agendamentos</h3>
+    <div id="listaAgenda"></div>
+
+    <h3>📜 Histórico Financeiro</h3>
+    <div id="listaFinanceiro"></div>
+
+    <button style="background: #999; margin-top: 30px; opacity: 0.5; font-size: 10px;" onclick="limparTudo()">REDEFINIR SISTEMA</button>
+</div>
+
+<script>
+    let agenda = JSON.parse(localStorage.getItem('solenne_agenda')) || [];
+    let financeiro = JSON.parse(localStorage.getItem('solenne_financeiro')) || [];
+    let indexEdicao = -1;
+
+    function formatarMoeda(valor) {
+        return "R$ " + parseFloat(valor).toFixed(2).replace('.', ',');
+    }
+
+    function atualizarTela() {
+        const divAgenda = document.getElementById('listaAgenda');
+        const divFinanceiro = document.getElementById('listaFinanceiro');
+        
+        divAgenda.innerHTML = '';
+        divFinanceiro.innerHTML = '';
+        
+        let totalAgenda = 0;
+        let totalGastos = 0;
+
+        // Calcular e Renderizar Agenda
+        agenda.forEach((item, index) => {
+            totalAgenda += parseFloat(item.valor);
+            divAgenda.innerHTML += `
+                <div class="item-lista">
+                    <div><strong>${item.cliente}</strong><br><small>${item.proc} | ${formatarMoeda(item.valor)}</small></div>
+                    <div class="acoes">
+                        <button class="btn-editar" onclick="prepararEdicao(${index})">✏️</button>
+                        <button class="btn-concluir" onclick="concluirServico(${index})">✔</button>
+                        <button class="btn-excluir" onclick="excluirAgendamento(${index})">🗑️</button>
+                    </div>
+                </div>`;
+        });
+
+        // Calcular e Renderizar Financeiro
+        financeiro.slice().reverse().forEach(item => {
+            if(item.tipo === 'saida') totalGastos += parseFloat(item.valor);
+            
+            const sinal = item.tipo === 'entrada' ? '+' : '-';
+            const cor = item.tipo === 'entrada' ? '' : 'negativo';
+            
+            divFinanceiro.innerHTML += `
+                <div class="item-lista">
+                    <span>${item.desc}</span>
+                    <span class="${cor}">${sinal} ${formatarMoeda(item.valor)}</span>
+                </div>`;
+        });
+
+        // Atualizar Painel de Saldos
+        document.getElementById('saldoPrevisto').innerText = formatarMoeda(totalAgenda);
+        document.getElementById('saldoGastos').innerText = formatarMoeda(totalGastos);
+        document.getElementById('saldoLiquido').innerText = formatarMoeda(totalAgenda - totalGastos);
+        
+        localStorage.setItem('solenne_agenda', JSON.stringify(agenda));
+        localStorage.setItem('solenne_financeiro', JSON.stringify(financeiro));
+    }
+
+    function processarAgendamento() {
+        const cliente = document.getElementById('ag_cliente').value;
+        const proc = document.getElementById('ag_proc').value;
+        const valor = document.getElementById('ag_valor').value;
+        const data = document.getElementById('ag_data').value;
+
+        if(!cliente || !valor || !data) return alert("Preencha todos os campos!");
+
+        const dado = { cliente, proc, valor, data };
+
+        if(indexEdicao === -1) agenda.push(dado);
+        else {
+            agenda[indexEdicao] = dado;
+            cancelarEdicao();
+        }
+
+        limparCampos();
+        atualizarTela();
+    }
+
+    function prepararEdicao(index) {
+        indexEdicao = index;
+        const item = agenda[index];
+        document.getElementById('ag_cliente').value = item.cliente;
+        document.getElementById('ag_proc').value = item.proc;
+        document.getElementById('ag_valor').value = item.valor;
+        document.getElementById('ag_data').value = item.data;
+        document.getElementById('titulo-form').innerText = "✏️ Editando Marcação";
+        document.getElementById('btn-principal').innerText = "Salvar Alteração";
+        document.getElementById('btn-cancelar-edit').style.display = "block";
+        window.scrollTo(0,0);
+    }
+
+    function cancelarEdicao() {
+        indexEdicao = -1;
+        limparCampos();
+        document.getElementById('titulo-form').innerText = "📅 Nova Marcação";
+        document.getElementById('btn-principal').innerText = "Agendar";
+        document.getElementById('btn-cancelar-edit').style.display = "none";
+    }
+
+    function adicionarGasto() {
+        const desc = document.getElementById('g_desc').value;
+        const valor = document.getElementById('g_valor').value;
+        if(!desc || !valor) return alert("Preencha os dados do gasto!");
+        financeiro.push({ desc: desc, valor: valor, tipo: 'saida' });
+        document.getElementById('g_desc').value = '';
+        document.getElementById('g_valor').value = '';
+        atualizarTela();
+    }
+
+    function concluirServico(index) {
+        const item = agenda.splice(index, 1)[0];
+        financeiro.push({ desc: `Concluído: ${item.cliente}`, valor: item.valor, tipo: 'entrada' });
+        atualizarTela();
+    }
+
+    function excluirAgendamento(index) {
+        if(confirm("Deseja excluir este agendamento?")) {
+            agenda.splice(index, 1);
+            atualizarTela();
+        }
+    }
+
+    function limparCampos() {
+        document.getElementById('ag_cliente').value = '';
+        document.getElementById('ag_proc').value = '';
+        document.getElementById('ag_valor').value = '';
+        document.getElementById('ag_data').value = '';
+    }
+
+    function limparTudo() {
+        if(confirm("Apagar todos os dados do Solenne Studio?")) {
+            agenda = []; financeiro = []; atualizarTela();
+        }
+    }
+
+    atualizarTela();
+</script>
+</body>
+</html>
