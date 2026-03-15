@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solenne Studio - Gestão</title>
+    <title>Solenne Studio - Gestão Pro</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #fce4ec; padding: 15px; margin: 0; }
         .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -12,7 +12,7 @@
         
         .painel-financeiro { background: #fdf2f8; padding: 15px; border-radius: 12px; border: 1px solid #f8bbd0; margin-bottom: 20px; }
         .linha-financeira { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-        .liquido-box { border-top: 2px solid #ad1457; padding-top: 10px; margin-top: 5px; font-weight: bold; font-size: 16px; color: #2e7d32; }
+        .liquido-box { border-top: 2px solid #ad1457; padding-top: 10px; margin-top: 5px; font-weight: bold; font-size: 16px; }
         
         .card { background: #fff; border: 1px solid #f8bbd0; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
         .instrucao-data { font-size: 11px; color: #ad1457; font-weight: bold; margin-bottom: 2px; display: block; }
@@ -29,7 +29,11 @@
         
         .item-lista { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 12px 0; font-size: 14px; }
         .acoes { display: flex; gap: 5px; }
-        .negativo { color: #d32f2f; }
+        
+        /* Cores Dinâmicas */
+        .negativo { color: #d32f2f !important; }
+        .positivo { color: #2e7d32 !important; }
+        .confirmado { color: #2e7d32; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -43,11 +47,15 @@
             <span id="saldoPrevisto">R$ 0,00</span>
         </div>
         <div class="linha-financeira">
+            <span>Serviços Concluídos (Caixa):</span>
+            <span id="saldoConfirmado" class="confirmado">R$ 0,00</span>
+        </div>
+        <div class="linha-financeira">
             <span>Registro de Gastos:</span>
             <span id="saldoGastos" class="negativo">R$ 0,00</span>
         </div>
         <div class="linha-financeira liquido-box">
-            <span>Saldo Líquido:</span>
+            <span>Saldo Líquido Total:</span>
             <span id="saldoLiquido">R$ 0,00</span>
         </div>
     </div>
@@ -96,10 +104,9 @@
         divFinanceiro.innerHTML = '';
         
         let totalAgenda = 0;
-        let totalConcluido = 0;
+        let totalConfirmado = 0;
         let totalGastos = 0;
 
-        // Soma Agenda
         agenda.forEach((item, index) => {
             totalAgenda += parseFloat(item.valor);
             divAgenda.innerHTML += `
@@ -113,13 +120,12 @@
                 </div>`;
         });
 
-        // Soma Concluídos e Gastos
         financeiro.slice().reverse().forEach(item => {
-            if(item.tipo === 'entrada') totalConcluido += parseFloat(item.valor);
+            if(item.tipo === 'entrada') totalConfirmado += parseFloat(item.valor);
             else totalGastos += parseFloat(item.valor);
             
             const sinal = item.tipo === 'entrada' ? '+' : '-';
-            const cor = item.tipo === 'entrada' ? '' : 'negativo';
+            const cor = item.tipo === 'entrada' ? 'positivo' : 'negativo';
             divFinanceiro.innerHTML += `
                 <div class="item-lista">
                     <span>${item.desc}</span>
@@ -127,12 +133,20 @@
                 </div>`;
         });
 
-        // CÁLCULO FINANCEIRO CORRIGIDO
-        const saldoLiquidoFinal = (totalAgenda + totalConcluido) - totalGastos;
+        const saldoLiquidoFinal = (totalAgenda + totalConfirmado) - totalGastos;
+        const eltLiquido = document.getElementById('saldoLiquido');
+
+        // Lógica de cores para o Saldo Líquido
+        if (saldoLiquidoFinal < 0) {
+            eltLiquido.className = 'negativo';
+        } else {
+            eltLiquido.className = 'positivo';
+        }
 
         document.getElementById('saldoPrevisto').innerText = formatarMoeda(totalAgenda);
+        document.getElementById('saldoConfirmado').innerText = formatarMoeda(totalConfirmado);
         document.getElementById('saldoGastos').innerText = formatarMoeda(totalGastos);
-        document.getElementById('saldoLiquido').innerText = formatarMoeda(saldoLiquidoFinal);
+        eltLiquido.innerText = formatarMoeda(saldoLiquidoFinal);
         
         localStorage.setItem('solenne_agenda', JSON.stringify(agenda));
         localStorage.setItem('solenne_financeiro', JSON.stringify(financeiro));
